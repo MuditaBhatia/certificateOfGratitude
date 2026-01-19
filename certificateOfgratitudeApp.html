@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Global Certificate of Gratitude</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body {
+      background: #f6f9fd;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 700px;
+      margin: 36px auto 24px auto;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 3px 24px 0 #0001;
+      padding: 32px 24px;
+    }
+    h1 {
+      text-align: center;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-top: 0;
+      margin-bottom: 26px;
+      font-size: 1.55em;
+      color: #202445;
+    }
+    label {
+      font-weight: 500;
+      display: block;
+      margin-bottom: 4px;
+      color: #353d5a;
+      margin-top: 15px;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 9px 10px;
+      margin-bottom: 10px;
+      font-size: 1em;
+      border-radius: 5px;
+      border: 1px solid #bfcbe6;
+      box-sizing: border-box;
+      background: #f7fafc;
+      transition: border 0.15s;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #399bff;
+      background: #fff;
+    }
+    textarea {
+      min-height: 110px;
+      resize: vertical;
+      max-height: 400px;
+    }
+    .mention-tip {
+      color: #4271cf;
+      font-size: 0.93em;
+      margin: -7px 0 9px 0;
+      text-align: right;
+    }
+    .mention-tip strong {
+      color: #1459bd;
+      font-weight: 600;
+    }
+    .btn-area {
+      display: flex;
+      gap: 11px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    button {
+      background: #4891fa;
+      border: none;
+      color: #fff;
+      font-size: 1em;
+      padding: 10px 18px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.16s;
+      font-weight: 500;
+    }
+    button:hover, button:focus {
+      background: #115ec9;
+    }
+    .cert-preview-area {
+      margin-top: 38px;
+      display: flex;
+      justify-content: center;
+    }
+    #cert-canvas {
+      border: 1.5px solid #c3d1ef;
+      border-radius: 8px;
+      background: #fff;
+      width: 980px;
+      height: 840px;
+      display: block;
+      box-shadow: 0 2px 18px 0 #0001;
+      max-width: 99vw;
+      height: auto;
+    }
+    @media (max-width: 1100px) {
+      .container {
+        max-width: 99vw;
+        padding: 19px 2vw;
+      }
+      #cert-canvas {
+        width: 98vw !important;
+        max-width: 99vw !important;
+      }
+    }
+    .note {
+      font-size: 0.97em;
+      color: #5f6d9e;
+      text-align: center;
+      margin: 10px 0 0 0;
+    }
+    .char-count {
+      font-size: 0.9em;
+      color: #8b94aa;
+      text-align: right;
+      margin-top: -10px;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Global Certificate of Gratitude</h1>
+    <form id="gratitudeForm" autocomplete="off">
+      <label for="recipient">Recipient's Name</label>
+      <input type="text" id="recipient" maxlength="46" required placeholder="Who are you grateful to?">
+
+      <label for="reason">Reason for Gratitude</label>
+      <input type="text" id="reason" maxlength="52" required placeholder="e.g. Selfless Support, Inspiring Leadership">
+
+      <label for="impact">How did their contribution make a difference?</label>
+      <textarea id="impact" maxlength="6000" required placeholder="Describe the positive impact, up to 1000 words. Use @Name or @Group for LinkedIn-style mentions..." rows="8"></textarea>
+      <div class="char-count" id="impact-char-count">0 / 6000</div>
+      <div class="mention-tip">
+        LinkedIn-style mentions: <strong>@Name</strong> or <strong>@Team_Name</strong> in your text will be highlighted. 
+      </div>
+
+      <label for="sender">Sender's Name</label>
+      <input type="text" id="sender" maxlength="46" required placeholder="Your name or group">
+
+      <div class="btn-area">
+        <button type="submit">Generate Certificate</button>
+        <button type="button" id="downloadBtn" style="display: none;">Download Certificate</button>
+        <button type="button" id="copyBtn" style="display: none;">Copy as Image</button>
+      </div>
+    </form>
+    <div class="cert-preview-area" style="margin-bottom:10px;">
+      <canvas id="cert-canvas" width="980" height="840" aria-label="Certificate Preview"></canvas>
+    </div>
+    <div class="note">
+      Fill out the form and click "Generate Certificate".<br>
+      Then you can download or copy your gratitude certificate.
+    </div>
+  </div>
+  <script>
+    const defaultData = {
+      recipient: 'World Citizen',
+      reason: 'Global Kindness',
+      impact: 'Your positive actions inspire people everywhere, especially @JaneDoe and @Global_Team, and make our world a better place for all.',
+      sender: 'The Global Community'
+    };
+    const GOLD = '#caaa2b';
+    const NAVY = '#183267';
+    const NAME_COLOR = '#c89c24';
+    const REASON_COLOR = '#244885';
+    const TITLE_COLOR = '#183267';
+
+    // Split impact text into tokens to detect @Mentions
+    function tokenizeMentions(text) {
+      // Split preserving spaces, for word positioning
+      const mentionRegex = /(@[\w\-]+)/g;
+      let res = [];
+      let lastIdx = 0;
+      let m;
+      while ((m = mentionRegex.exec(text)) !== null) {
+        if (m.index > lastIdx)
+          res.push({text: text.substring(lastIdx, m.index), mention: false});
+        res.push({text: m[0], mention: true});
+        lastIdx = mentionRegex.lastIndex;
+      }
+      if (lastIdx < text.length)
+        res.push({text: text.substring(lastIdx), mention: false});
+      return res;
+    }
+
+    // Word wrap with mentions HIGHLIGHTED
+    function wrapTextMentionsDraw(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+      // Returns number of lines used
+      if (!text) return 0;
+      let lines = [];
+      let paragraphs = text.split(/\r?\n/g);
+      for (let pg of paragraphs) {
+        let tokens = [];
+        // Split paragraph into words so we can build lines by measuring
+        let words = pg.split(' ');
+        for (let w of words) {
+          if ((w.match(/^@[\w\-]+/))) {
+            tokens.push({ text: w, mention: true });
+          } else {
+            tokens.push({ text: w, mention: false });
+          }
+        }
+        // Now build lines
+        let line = [];
+        let lineWidth = 0;
+        let spaceWidth = ctx.measureText(' ').width;
+        for(let i=0; i<tokens.length; ++i) {
+          let tok = tokens[i];
+          // Use @mention font if needed
+          ctx.font = tok.mention ? '700 1.18em Segoe UI, Arial' : '400 1.18em Segoe UI, Arial';
+          let w = ctx.measureText(tok.text).width;
+          let tryWidth = (lineWidth === 0 ? 0 : lineWidth + spaceWidth) + w;
+          if (tryWidth > maxWidth && line.length) {
+            lines.push(line.slice());
+            line = [];
+            lineWidth = 0;
+          }
+          if (lineWidth !== 0) {
+            line.push({ text: ' ', mention: false }); // add space before each word except first
+            lineWidth += spaceWidth;
+          }
+          line.push(tok);
+          lineWidth += w;
+        }
+        if (line.length)
+          lines.push(line.slice());
+      }
+      if (maxLines && lines.length > maxLines) {
+        // Truncate and add ... at end of last line
+        let num = maxLines;
+        lines = lines.slice(0, num);
+        let lastLineArr = lines[num-1];
+        // Remove from the end until fits ...
+        ctx.font = '400 1.18em Segoe UI, Arial';
+        let ell = '...';
+        let curWidth = 0;
+        let ellWidth = ctx.measureText(ell).width;
+        for(let i=0; i<lastLineArr.length; ++i) {
+          ctx.font = lastLineArr[i].mention ? '700 1.18em Segoe UI, Arial' : '400 1.18em Segoe UI, Arial';
+          curWidth += ctx.measureText(lastLineArr[i].text).width;
+        }
+        while(curWidth + ellWidth > maxWidth && lastLineArr.length > 0) {
+          let lastTok = lastLineArr.pop();
+          ctx.font = lastTok && lastTok.mention ? '700 1.18em Segoe UI, Arial' : '400 1.18em Segoe UI, Arial';
+          curWidth -= ctx.measureText(lastTok ? lastTok.text : '').width;
+          // Remove also prior space if token was a space
+        }
+        lastLineArr.push({text: ell, mention: false});
+        lines[num-1] = lastLineArr;
+      }
+      // Draw lines
+      for(let lineIdx=0; lineIdx<lines.length; ++lineIdx) {
+        let line = lines[lineIdx];
+        let totalWidth = 0, wordWidths = [];
+        for(let tok of line) {
+          ctx.font = tok.mention ? '700 1.18em Segoe UI, Arial' : '400 1.18em Segoe UI, Arial';
+          let w = ctx.measureText(tok.text).width;
+          wordWidths.push(w);
+          totalWidth += w;
+        }
+        // Now draw:
+        let cursor = x - totalWidth/2;
+        for(let i=0;i<line.length;++i) {
+          let t = line[i];
+          ctx.font = t.mention ? '700 1.18em Segoe UI, Arial' : '400 1.18em Segoe UI, Arial';
+          ctx.fillStyle = t.mention ? "#1167b1" : "#222949";
+          ctx.textAlign = 'left';
+          ctx.fillText(t.text, cursor, y + lineIdx*lineHeight);
+          cursor += wordWidths[i];
+        }
+      }
+      return lines.length;
+    }
+
+    function drawBlankCertificateBorders(ctx, W, H) {
+      ctx.clearRect(0, 0, W, H);
+      ctx.save();
+      ctx.fillStyle="#fff";
+      ctx.fillRect(0,0,W,H);
+      // Thin gold outer border
+      ctx.strokeStyle = GOLD;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      roundRect(ctx, 9, 9, W-18, H-18, 22);
+      ctx.closePath();
+      ctx.stroke();
+
+      // Very thin navy blue inside border
+      ctx.strokeStyle = NAVY;
+      ctx.lineWidth = 2.3;
+      ctx.beginPath();
+      roundRect(ctx, 24, 24, W-48, H-48, 17);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x+r, y);
+      ctx.lineTo(x+w-r, y);
+      ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+      ctx.lineTo(x+w, y+h-r);
+      ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+      ctx.lineTo(x+r, y+h);
+      ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+      ctx.lineTo(x, y+r);
+      ctx.quadraticCurveTo(x, y, x+r, y);
+      ctx.closePath();
+    }
+
+    function drawCertificate(ctx, {
+      recipient,
+      reason,
+      impact,
+      sender,
+      date
+    }) {
+      const W = ctx.canvas.width, H = ctx.canvas.height;
+      drawBlankCertificateBorders(ctx, W, H);
+
+      // Title
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.fillStyle = TITLE_COLOR;
+      ctx.font = '700 2.4em Segoe UI, Arial';
+      ctx.shadowColor="#e7b41b"; ctx.shadowBlur=8;
+      ctx.fillText('Certificate of Gratitude', W/2, 106);
+      ctx.shadowBlur = 0;
+      ctx.restore();
+
+      // "Presented to"
+      ctx.font = '500 1.1em Segoe UI, Arial';
+      ctx.fillStyle = TITLE_COLOR;
+      ctx.textAlign = 'center';
+      ctx.fillText('Presented with appreciation to', W/2, 162);
+
+      // Recipient name
+      ctx.font = '700 1.85em Segoe UI, Arial';
+      ctx.fillStyle = NAME_COLOR;
+      ctx.textAlign = 'center';
+      ctx.fillText(recipient, W/2, 206);
+
+      // Reason
+      ctx.font = '500 1.2em Segoe UI, Arial';
+      ctx.fillStyle = TITLE_COLOR;
+      ctx.textAlign = 'center';
+      ctx.fillText('For', W/2, 240);
+      ctx.font = '600 1.35em Segoe UI, Arial';
+      ctx.fillStyle = REASON_COLOR;
+      ctx.textAlign = 'center';
+      ctx.fillText(reason, W/2, 270);
+
+      // Divider (keep for visual sectioning)
+      drawLineDivider(ctx, 160, W-160, 288, GOLD, NAVY);
+
+      // Impact/Elaboration with mentions
+      ctx.textAlign='left';
+      // main fillStyle set in wrapTextMentionsDraw per token
+      let boxTop = 320, impactMaxW = W - 180;
+      wrapTextMentionsDraw(ctx, impact, W/2, boxTop, impactMaxW, 32, 9);
+
+      // Centered Date & With gratitude
+      const centerDateY = H-124;
+      ctx.font = '500 1.08em Segoe UI, Arial';
+      ctx.fillStyle = TITLE_COLOR;
+      ctx.textAlign = "center";
+      ctx.fillText('Date: ' + date, W/2, centerDateY);
+
+      ctx.font = '500 1.08em Segoe UI, Arial';
+      ctx.fillStyle = TITLE_COLOR;
+      ctx.textAlign = "center";
+      ctx.fillText('With gratitude,', W/2, H-71);
+
+      ctx.font = 'italic 700 1.33em Segoe UI, Arial';
+      ctx.fillStyle = NAME_COLOR;
+      ctx.textAlign = "center";
+      ctx.fillText(sender, W/2, H-39);
+
+      ctx.restore();
+    }
+
+    function drawLineDivider(ctx, x1, x2, y, gold, navy) {
+      ctx.save();
+      ctx.lineWidth = 1.7;
+      let grad = ctx.createLinearGradient(x1, y, x2, y);
+      grad.addColorStop(0, gold);
+      grad.addColorStop(0.5, navy);
+      grad.addColorStop(1, gold);
+      ctx.strokeStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(x1, y);
+      ctx.lineTo(x2, y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Form controls
+    const form = document.getElementById('gratitudeForm');
+    const recipientInput = document.getElementById('recipient');
+    const reasonInput = document.getElementById('reason');
+    const impactInput = document.getElementById('impact');
+    const senderInput = document.getElementById('sender');
+    const canvas = document.getElementById('cert-canvas');
+    const ctx = canvas.getContext('2d');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const charCountEl = document.getElementById('impact-char-count');
+
+    function renderCertificate(data) {
+      const todayStr = new Date().toLocaleDateString(undefined, {year:'numeric', month:'long', day:'numeric'});
+      drawCertificate(ctx, {
+        recipient: data.recipient.trim()||defaultData.recipient,
+        reason: data.reason.trim()||defaultData.reason,
+        impact: data.impact.trim()||defaultData.impact,
+        sender: data.sender.trim()||defaultData.sender,
+        date: todayStr
+      });
+    }
+
+    renderCertificate(defaultData);
+
+    form.onsubmit = e => {
+      e.preventDefault();
+      renderCertificate({
+        recipient: recipientInput.value,
+        reason: reasonInput.value,
+        impact: impactInput.value,
+        sender: senderInput.value
+      });
+      downloadBtn.style.display = copyBtn.style.display = 'inline-block';
+    };
+
+    downloadBtn.onclick = () => {
+      const link = document.createElement('a');
+      link.download = 'certificate-of-gratitude.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    };
+
+    async function copyCanvasToClipboard(canvas) {
+      try {
+        if (navigator.clipboard && window.ClipboardItem) {
+          canvas.toBlob(async function(b){
+            const item = new ClipboardItem({'image/png': b});
+            await navigator.clipboard.write([item]);
+          })
+        } else {
+          throw "Clipboard API not available";
+        }
+      } catch (e) {
+        alert("Sorry, copying images is not supported in this browser.");
+      }
+    }
+    copyBtn.onclick = async () => {
+      copyBtn.disabled = true;
+      copyBtn.textContent = "Copying...";
+      await copyCanvasToClipboard(canvas);
+      copyBtn.textContent = "Copied!";
+      setTimeout(()=>{
+        copyBtn.disabled = false; copyBtn.textContent = "Copy as Image";
+      }, 1300);
+    };
+
+    function updateCharCount() {
+      charCountEl.textContent = impactInput.value.length + " / 6000";
+      if(impactInput.value.length>=6000){
+        charCountEl.style.color='#d45321';
+      } else {
+        charCountEl.style.color='#8b94aa';
+      }
+    }
+    impactInput.addEventListener('input', updateCharCount);
+
+    [
+      recipientInput, reasonInput, impactInput, senderInput
+    ].forEach(inp=>{
+      inp.addEventListener('input',()=> {
+        renderCertificate({
+          recipient: recipientInput.value,
+          reason: reasonInput.value,
+          impact: impactInput.value,
+          sender: senderInput.value
+        });
+      });
+    });
+
+    updateCharCount();
+  </script>
+</body>
+</html>
